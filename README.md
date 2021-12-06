@@ -140,6 +140,28 @@ Run the `tasks` collection of functions in parallel, without waiting until the p
     - type: io/print
       text: goodbye
 ```
+## DAG
+
+Run the `tasks` collection of functions based on the dependencies provided.
+
+```
+  - type: dag
+    label: dag example tasks
+    tasks:
+      - type: io/print
+        text: task A
+        name: A
+
+      - type: io/print
+        text: task B
+        name: B
+        depends:
+          - A
+          
+      - type: io/print
+        text: task A1
+        name: A1
+```
 
 ## Fork/Join
 
