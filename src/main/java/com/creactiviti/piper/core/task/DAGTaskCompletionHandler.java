@@ -39,19 +39,24 @@ public class DAGTaskCompletionHandler implements TaskCompletionHandler {
             counterRepository.delete(aTaskExecution.getParentId());
             dagRepository.delete(aTaskExecution.getParentId());
         } else {
-            MapObject nextTask = dagRepository.getNextTask(aTaskExecution.getParentId());
-            if(null!= nextTask) {
-                SimpleTaskExecution dagTask = SimpleTaskExecution.of(nextTask);
-                dagTask.setId(UUIDGenerator.generate());
-                dagTask.setParentId(aTaskExecution.getParentId());
-                dagTask.setStatus(TaskStatus.CREATED);
-                dagTask.setJobId(aTaskExecution.getJobId());
-                dagTask.setCreateTime(new Date());
-                dagTask.setPriority(aTaskExecution.getPriority());
-                taskExecutionRepo.create(dagTask);
-                taskDispatcher.dispatch(dagTask);
+            Set<MapObject> nextTasks = dagRepository.getNextTasks(aTaskExecution.getParentId());
+            if(null!= nextTasks && !nextTasks.isEmpty()){
+                for(MapObject nextTask: nextTasks){
+                    if(null!= nextTask) {
+                        SimpleTaskExecution dagTask = SimpleTaskExecution.of(nextTask);
+                        dagTask.setId(UUIDGenerator.generate());
+                        dagTask.setParentId(aTaskExecution.getParentId());
+                        dagTask.setStatus(TaskStatus.CREATED);
+                        dagTask.setJobId(aTaskExecution.getJobId());
+                        dagTask.setCreateTime(new Date());
+                        dagTask.setPriority(aTaskExecution.getPriority());
+                        taskExecutionRepo.create(dagTask);
+                        taskDispatcher.dispatch(dagTask);
 
+                    }
+                }
             }
+
         }
     }
 

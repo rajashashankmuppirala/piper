@@ -25,30 +25,19 @@ public class DAGRepository {
         updateDAGTask(aStackId,task);
     }
 
-
-    public synchronized MapObject getNextTask(String aStackId){
-        MapObject nextTask = peekNextTask(aStackId);
-        tasksMap.get(aStackId).remove(nextTask);
-        return nextTask;
+    public synchronized Set<MapObject> getNextTasks(String aStackId){
+        Set<MapObject> nextTasks = peekNextTasks(aStackId);
+        tasksMap.get(aStackId).removeAll(nextTasks);
+        return nextTasks;
     }
-
-    private synchronized MapObject peekNextTask(String aStackId) {
-        for(MapObject task: tasksMap.get(aStackId)) {
-            if(dependenciesMap.get(aStackId).containsKey(task)){
-                List<MapObject> dependencyTask = dependenciesMap.get(aStackId).get(task);
-                if(dependencyTask.isEmpty()){
-                    return task;
-                }
-            } else {
-                return task;
-            }
-
-        }
-        return null;
+    
+    private synchronized Set<MapObject> peekNextTasks(String aStackId){
+        return tasksMap.get(aStackId).stream().filter(task ->
+            (dependenciesMap.get(aStackId)== null || dependenciesMap.get(aStackId).get(task).isEmpty())).collect(Collectors.toSet());
     }
 
     public Set<MapObject> getRootNodes(String aStackId){
-        return tasksMap.get(aStackId).stream().filter(mapObject -> !dependenciesMap.get(aStackId).containsKey(mapObject))
+        return tasksMap.get(aStackId).stream().filter(mapObject -> dependenciesMap.get(aStackId) == null || !dependenciesMap.get(aStackId).containsKey(mapObject))
                 .collect(Collectors.toSet());
     }
 
@@ -57,11 +46,12 @@ public class DAGRepository {
     }
 
     public synchronized void notifyTask(String aStackId, String taskName){
-
-        Set<MapObject> tasks = dependenciesMap.get(aStackId).values().stream()
-                .filter(mapObject -> mapObject.get("name").equals(taskName)).collect(Collectors.toSet());
-        if(null!=tasks && !tasks.isEmpty()){
-            dependenciesMap.get(aStackId).values().removeAll(tasks);
+        if(null!= dependenciesMap.get(aStackId)){
+            Set<MapObject> tasks = dependenciesMap.get(aStackId).values().stream()
+                    .filter(mapObject -> mapObject.get("name").equals(taskName)).collect(Collectors.toSet());
+            if(null!=tasks && !tasks.isEmpty()){
+                dependenciesMap.get(aStackId).values().removeAll(tasks);
+            }
         }
     }
 
