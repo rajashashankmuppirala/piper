@@ -1,0 +1,40 @@
+label: Hello World
+inputs:
+  - name: name
+    label: Your Name
+    type: core/var
+    required: true
+tasks:
+  - type: dag
+    label: dag example tasks
+    tasks:
+      - type: io/print
+        text: task A
+        name: A
+
+      - type: io/print
+        text: task A1
+        name: A1
+
+      - type: io/print
+        text: task B
+        name: B
+        depends:
+          - C
+
+      - type: io/print
+        text: task C
+        name: C
+        depends:
+          - A
+
+      - type: io/print
+        text: task D
+        name: D
+        depends:
+          - C
+
+  - label: Print a farewell
+    type: io/print
+    text: Goodbye ${name}! Hope that is enough understanding now!!!
+

@@ -18,6 +18,8 @@ package com.creactiviti.piper.config;
 import java.util.Arrays;
 import java.util.List;
 
+import com.creactiviti.piper.core.context.DAGRepository;
+import com.creactiviti.piper.core.task.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,22 +48,6 @@ import com.creactiviti.piper.core.event.TaskStartedWebhookEventListener;
 import com.creactiviti.piper.core.job.JobRepository;
 import com.creactiviti.piper.core.messagebroker.MessageBroker;
 import com.creactiviti.piper.core.pipeline.PipelineRepository;
-import com.creactiviti.piper.core.task.ControlTaskDispatcher;
-import com.creactiviti.piper.core.task.CounterRepository;
-import com.creactiviti.piper.core.task.EachTaskDispatcher;
-import com.creactiviti.piper.core.task.ForkTaskDispatcher;
-import com.creactiviti.piper.core.task.MapTaskDispatcher;
-import com.creactiviti.piper.core.task.ParallelTaskCompletionHandler;
-import com.creactiviti.piper.core.task.ParallelTaskDispatcher;
-import com.creactiviti.piper.core.task.SpelTaskEvaluator;
-import com.creactiviti.piper.core.task.SubflowJobStatusEventListener;
-import com.creactiviti.piper.core.task.SubflowTaskDispatcher;
-import com.creactiviti.piper.core.task.SwitchTaskDispatcher;
-import com.creactiviti.piper.core.task.TaskDispatcher;
-import com.creactiviti.piper.core.task.TaskDispatcherChain;
-import com.creactiviti.piper.core.task.TaskDispatcherResolver;
-import com.creactiviti.piper.core.task.TaskExecutionRepository;
-import com.creactiviti.piper.core.task.WorkTaskDispatcher;
 
 @Configuration
 @ConditionalOnCoordinator
@@ -75,7 +61,7 @@ public class CoordinatorConfiguration {
   @Autowired @Lazy private MessageBroker messageBroker;
   @Autowired @Lazy private EventPublisher eventPublisher;
   @Autowired private Environment environment;
-  
+
   @Bean
   Coordinator coordinator () {
     Coordinator coordinator = new Coordinator();
@@ -91,12 +77,17 @@ public class CoordinatorConfiguration {
     coordinator.setMessageBroker(messageBroker);
     return coordinator;
   }
-  
+
+  @Bean
+  DAGRepository dagRepository () {
+    return new DAGRepository();
+  }
+
   @Bean
   ErrorHandler errorHandler () {
     return new ErrorHandlerChain(Arrays.asList(jobTaskErrorHandler()));
   }
-  
+
   @Bean
   TaskExecutionErrorHandler jobTaskErrorHandler () {
     TaskExecutionErrorHandler jobTaskErrorHandler = new TaskExecutionErrorHandler();
@@ -106,7 +97,7 @@ public class CoordinatorConfiguration {
     jobTaskErrorHandler.setEventPublisher(eventPublisher);
     return jobTaskErrorHandler;
   }
-  
+
   @Bean
   TaskCompletionHandlerChain taskCompletionHandler () {
     TaskCompletionHandlerChain taskCompletionHandlerChain = new TaskCompletionHandlerChain();
@@ -114,13 +105,14 @@ public class CoordinatorConfiguration {
       eachTaskCompletionHandler(taskCompletionHandlerChain),
       mapTaskCompletionHandler(taskCompletionHandlerChain),
       parallelTaskCompletionHandler(taskCompletionHandlerChain),
+      dagTaskCompletionHandler(taskCompletionHandlerChain),
       forkTaskCompletionHandler(taskCompletionHandlerChain),
       switchTaskCompletionHandler(taskCompletionHandlerChain),
       defaultTaskCompletionHandler()
     ));
     return taskCompletionHandlerChain;
   }
-  
+
   @Bean
   DefaultTaskCompletionHandler defaultTaskCompletionHandler () {
     DefaultTaskCompletionHandler taskCompletionHandler = new DefaultTaskCompletionHandler();
@@ -133,7 +125,7 @@ public class CoordinatorConfiguration {
     taskCompletionHandler.setTaskEvaluator(SpelTaskEvaluator.builder().environment(environment).build());
     return taskCompletionHandler;
   }
-  
+
   @Bean
   SwitchTaskCompletionHandler switchTaskCompletionHandler (TaskCompletionHandler aTaskCompletionHandler) {
     return new SwitchTaskCompletionHandler(
@@ -144,7 +136,7 @@ public class CoordinatorConfiguration {
       SpelTaskEvaluator.builder().environment(environment).build()
     );
   }
-  
+
   @Bean
   SwitchTaskDispatcher switchTaskDispatcher (TaskDispatcher aTaskDispatcher) {
     return new SwitchTaskDispatcher(
@@ -155,17 +147,17 @@ public class CoordinatorConfiguration {
       SpelTaskEvaluator.builder().environment(environment).build()
     );
   }
-  
+
   @Bean
   EachTaskCompletionHandler eachTaskCompletionHandler (TaskCompletionHandler aTaskCompletionHandler) {
     return new EachTaskCompletionHandler(taskExecutionRepo,aTaskCompletionHandler,counterRepository);
   }
-  
+
   @Bean
   MapTaskCompletionHandler mapTaskCompletionHandler (TaskCompletionHandler aTaskCompletionHandler) {
     return new MapTaskCompletionHandler(taskExecutionRepo,aTaskCompletionHandler,counterRepository);
   }
-  
+
   @Bean
   ParallelTaskCompletionHandler parallelTaskCompletionHandler (TaskCompletionHandler aTaskCompletionHandler) {
     ParallelTaskCompletionHandler dispatcher = new ParallelTaskCompletionHandler();
@@ -174,34 +166,44 @@ public class CoordinatorConfiguration {
     dispatcher.setTaskExecutionRepository(taskExecutionRepo);
     return dispatcher;
   }
-  
+
   @Bean
   ForkTaskCompletionHandler forkTaskCompletionHandler (TaskCompletionHandler aTaskCompletionHandler) {
     return new ForkTaskCompletionHandler(
-      taskExecutionRepo, 
-      aTaskCompletionHandler, 
-      counterRepository, 
-      taskDispatcher(), 
+      taskExecutionRepo,
+      aTaskCompletionHandler,
+      counterRepository,
+      taskDispatcher(),
       contextRepository,
       SpelTaskEvaluator.builder().environment(environment).build()
     );
   }
-  
+
+  @Bean
+  DAGTaskCompletionHandler dagTaskCompletionHandler (TaskCompletionHandler aTaskCompletionHandler) {
+    return new DAGTaskCompletionHandler(
+            taskExecutionRepo,
+            aTaskCompletionHandler,
+            counterRepository,
+            taskDispatcher(),
+            dagRepository());
+  }
+
   @Bean
   SubflowTaskDispatcher subflowTaskDispatcher () {
     return new SubflowTaskDispatcher(messageBroker);
   }
-  
+
   @Bean
   SubflowJobStatusEventListener subflowJobStatusEventListener () {
     return new SubflowJobStatusEventListener(
-      jobRepository, 
-      taskExecutionRepo, 
+      jobRepository,
+      taskExecutionRepo,
       coordinator(),
       SpelTaskEvaluator.builder().environment(environment).build()
     );
   }
-  
+
   @Bean
   DefaultJobExecutor jobExecutor () {
     DefaultJobExecutor jobExecutor = new DefaultJobExecutor();
@@ -214,7 +216,7 @@ public class CoordinatorConfiguration {
                                                   .build());
     return jobExecutor;
   }
-  
+
   @Bean
   TaskDispatcherChain taskDispatcher () {
     TaskDispatcherChain taskDispatcher = new TaskDispatcherChain();
@@ -222,6 +224,7 @@ public class CoordinatorConfiguration {
       eachTaskDispatcher(taskDispatcher),
       mapTaskDispatcher(taskDispatcher),
       parallelTaskDispatcher(taskDispatcher),
+      dagTaskDispatcher(taskDispatcher),
       forkTaskDispatcher(taskDispatcher),
       switchTaskDispatcher(taskDispatcher),
       controlTaskDispatcher(),
@@ -231,12 +234,12 @@ public class CoordinatorConfiguration {
     taskDispatcher.setResolvers(resolvers);
     return taskDispatcher;
   }
-  
+
   @Bean
   ControlTaskDispatcher controlTaskDispatcher () {
     return new ControlTaskDispatcher(messageBroker);
   }
-  
+
   @Bean
   EachTaskDispatcher eachTaskDispatcher (TaskDispatcher aTaskDispatcher) {
     return new EachTaskDispatcher(
@@ -248,7 +251,7 @@ public class CoordinatorConfiguration {
       SpelTaskEvaluator.builder().environment(environment).build()
     );
   }
-  
+
   @Bean
   MapTaskDispatcher mapTaskDispatcher (TaskDispatcher aTaskDispatcher) {
     return MapTaskDispatcher.builder()
@@ -259,8 +262,8 @@ public class CoordinatorConfiguration {
                             .counterRepository(counterRepository)
                             .taskEvaluator(SpelTaskEvaluator.builder().environment(environment).build())
                             .build();
-  }  
-  
+  }
+
   @Bean
   ParallelTaskDispatcher parallelTaskDispatcher (TaskDispatcher aTaskDispatcher) {
     ParallelTaskDispatcher dispatcher = new ParallelTaskDispatcher();
@@ -271,7 +274,7 @@ public class CoordinatorConfiguration {
     dispatcher.setTaskExecutionRepository(taskExecutionRepo);
     return dispatcher;
   }
-  
+
   @Bean
   ForkTaskDispatcher forkTaskDispatcher (TaskDispatcher aTaskDispatcher) {
     ForkTaskDispatcher forkTaskDispatcher = new ForkTaskDispatcher();
@@ -283,12 +286,24 @@ public class CoordinatorConfiguration {
     forkTaskDispatcher.setCounterRepository(counterRepository);
     return forkTaskDispatcher;
   }
-  
+
   @Bean
   WorkTaskDispatcher workTaskDispatcher () {
     return new WorkTaskDispatcher(messageBroker);
   }
-    
+
+  @Bean
+  DAGTaskDispatcher dagTaskDispatcher (TaskDispatcher aTaskDispatcher) {
+    return new DAGTaskDispatcher(
+            aTaskDispatcher,
+            taskExecutionRepo,
+            messageBroker,
+            contextRepository,
+            counterRepository,
+            dagRepository()
+    );
+  }
+
   @Bean
   TaskStartedEventListener taskStartedEventListener () {
     return new TaskStartedEventListener(taskExecutionRepo, taskDispatcher(), jobRepository);
@@ -303,10 +318,10 @@ public class CoordinatorConfiguration {
   JobStatusWebhookEventListener webhookEventHandler () {
     return new JobStatusWebhookEventListener(jobRepository);
   }
-  
+
   @Bean
   TaskStartedWebhookEventListener taskStartedWebhookEventListener () {
     return new TaskStartedWebhookEventListener(jobRepository);
   }
-  
+
 }

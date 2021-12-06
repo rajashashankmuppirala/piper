@@ -1,0 +1,109 @@
+label: Hello World
+inputs:
+  - name: name
+    label: Your Name
+    type: core/var
+    required: true
+tasks:
+  - label: Print a greeting
+    type: io/print
+    text: Hello ${name}. Lets explore various flows!!!
+
+  - type: fork
+    label: level 1 fork
+    branches:
+      - - type: io/print
+          text: branch1-task1
+
+        - type: time/sleep
+          millis: 5000
+
+        - type: parallel
+          label: level 1 parallel
+          tasks:
+            - type: io/print
+              text: branch1-task1-parallel1
+
+            - type: io/print
+              text: branch1-task1-parallel2
+
+        - type: time/sleep
+          millis: 5000
+
+        - type: io/print
+          text: branch1-task2
+
+      - - type: io/print
+          text: branch2-task1
+
+        - type: time/sleep
+          millis: 5000
+
+        - type: parallel
+          label: level 1 parallel
+          tasks:
+            - type: io/print
+              text: branch2-task1-parallel1
+
+            - type: io/print
+              text: branch2-task1-parallel2
+
+        - type: time/sleep
+          millis: 5000
+
+        - type: io/print
+          text: branch2-task2
+
+        - type: time/sleep
+          millis: 5000
+
+        - type: fork
+          label: level2 fork branch2
+          branches:
+            - - type: io/print
+                text: fork2-branch1-task1
+
+              - type: time/sleep
+                millis: 5000
+
+              - type: io/print
+                text: fork2-branch1-task2
+
+              - type: time/sleep
+                millis: 5000
+
+            - - type: io/print
+                text: fork2-branch2-task1
+
+              - type: time/sleep
+                millis: 5000
+
+              - type: io/print
+                text: fork2-branch2-task2
+
+              - type: time/sleep
+                millis: 5000
+
+        - type: io/print
+          text: branch2-task3
+
+  - type: parallel
+    label: nested parallel and sequence
+    tasks:
+      - type: parallel
+        tasks:
+          - type: io/print
+            text: nested-parallel1-task1
+
+          - type: io/print
+            text: nested-parallel1-task2
+
+      - type: io/print
+        text: nested parallel2
+
+  - label: Print a farewell
+    type: io/print
+    text: Goodbye ${name}! Hope that is enough understanding now!!!
+
+
+
